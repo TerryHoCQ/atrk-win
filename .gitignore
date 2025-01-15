@@ -1,0 +1,43 @@
+# Compiled Object files
+atrk-win-202*
+ports/Debug
+ports/Release
+ps/Debug
+ps/Release
+rawdir/bin
+rawdir/build
+rawdir/test/tmp
+rawdir/test/test1.7z
+UpgradeLog.htm
+*.lo
+*.o
+*.sdf
+*.ipch
+*.obj
+*.pdb
+*.DS_Store
+*.pch
+*.idb
+*.opensdf
+*.db
+
+# Visual Studio Files
+*.opendb
+*.suo
+*.lastbuildstate
+*.user
+.vs/
+ipch/
+
+# Compilation Directories
+Lib/
+Exe/
+Intermediate/
+dll/
+**/x64/
+
+# Misc
+*.log
+*.tlog
+build/*
+!build/.gitkeep
