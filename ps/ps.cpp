@@ -45,6 +45,11 @@ int FindHiddenProcess(std::vector<ProcItem>& out)
 	std::vector<ProcItem> psls2, psls2e;
 	std::vector<ProcItem> psls3, psls3e;
 	std::vector<ProcItem> psls4;
+	std::vector<ProcItem> psls5, psls5e;
+
+	_ftprintf(stdout, _T("Method 5: Retrieving process list using SystemExtendedHandleInformation...\n"));
+	ps_m5(psls5);
+	_ftprintf(stdout, _T("    Total processes: %d\n"), (int)psls5.size());
 
 	_ftprintf(stdout, _T("Method 4: Bruteforce searching for PIDs using OpenProcess, from 12 to %d...\n"), max_pid);
 	ps_m4(psls4, max_pid);  // OpenProcess
@@ -62,6 +67,7 @@ int FindHiddenProcess(std::vector<ProcItem>& out)
 	ps_m1(psls1);  // CreateToolhelp32Snapshot
 	_ftprintf(stdout, _T("    Total processes: %d\n"), (int)psls1.size());
 
+	ps_m5(psls5e);
 	ps_m3(psls3e);
 	ps_m2(psls2e);
 
@@ -72,18 +78,28 @@ int FindHiddenProcess(std::vector<ProcItem>& out)
 		if (!TestPIDInList(psls1, it.dwPID) && TestPIDInList(psls2e, it.dwPID)) {
 			psResultAdd(out, it);
 			nfound += 1;
+			_ftprintf(stdout, _T("Method 2: Found %d\n"), it.dwPID);
 		}
 	}
 	for (auto& it : psls3) {
 		if (!TestPIDInList(psls1, it.dwPID) && TestPIDInList(psls3e, it.dwPID)) {
 			psResultAdd(out, it);
 			nfound += 1;
+			_ftprintf(stdout, _T("Method 3: Found %d\n"), it.dwPID);
 		}
 	}
 	for (auto& it : psls4) {
 		if (!TestPIDInList(psls1, it.dwPID) && ps_m4_test(it.dwPID)) {
 			psResultAdd(out, it);
 			nfound += 1;
+			_ftprintf(stdout, _T("Method 4: Found %d\n"), it.dwPID);
+		}
+	}
+	for (auto& it : psls5) {
+		if (!TestPIDInList(psls1, it.dwPID) && TestPIDInList(psls5e, it.dwPID)) {
+			psResultAdd(out, it);
+			nfound += 1;
+			_ftprintf(stdout, _T("Method 5: Found %d\n"), it.dwPID);
 		}
 	}
 	return nfound;
@@ -92,7 +108,7 @@ int FindHiddenProcess(std::vector<ProcItem>& out)
 
 int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
 {
-	_ftprintf(stderr, _T("atrk-win: ps v1.0.0\n"));
+	_ftprintf(stderr, _T("atrk-win: ps v1.1.0\n"));
 
 	int nRetCode = 0;
 	LPCTSTR output_csv = NULL;

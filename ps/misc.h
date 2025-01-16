@@ -27,3 +27,4 @@ BOOL ps_m2(std::vector<ProcItem>& ls); //SystemExtendedProcessinformation
 BOOL ps_m3(std::vector<ProcItem>& ls); //SystemSessionProcessInformation
 BOOL ps_m4(std::vector<ProcItem>& ls, DWORD mpid); // ±©Á¦OpenProcess
 BOOL ps_m4_test(DWORD dwPID);
+BOOL ps_m5(std::vector<ProcItem>& ls); //SystemExtendedHandleInformation

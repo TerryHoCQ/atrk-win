@@ -4,6 +4,20 @@
 #include <psapi.h>
 #include <wtsapi32.h>
 #include <algorithm>
+#include <Tlhelp32.h>
+#include <string>
+#include <map>
+#include <set>
+
+#ifndef NT_SUCCESS
+#define NT_SUCCESS(Status) ((NTSTATUS)(Status) >= 0)
+#endif
+#ifndef STATUS_INSUFFICIENT_RESOURCES
+#define STATUS_INSUFFICIENT_RESOURCES    ((NTSTATUS)0xC000009AL)
+#endif
+#ifndef STATUS_INFO_LENGTH_MISMATCH
+#define STATUS_INFO_LENGTH_MISMATCH    ((NTSTATUS)0xC0000004L)
+#endif
 
 #pragma comment(lib, "wtsapi32.lib")
 
@@ -204,7 +218,7 @@ BOOL GetProcessPathByPid1(DWORD dwPID, LPTSTR lpszBuf, int nBufSize, int verb) {
 		nullptr
 		);
 
-	if (status == (NTSTATUS)0xC0000004L) { //STATUS_INFO_LENGTH_MISMATCH
+	if (status == (NTSTATUS)STATUS_INFO_LENGTH_MISMATCH) {
 		HeapFree(GetProcessHeap(), 0, buffer);
 		bufferSize = processIdInfo.ImageName.MaximumLength;
 		buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bufferSize);
@@ -388,7 +402,7 @@ RETRY:
 		pProcessInfo, bufferSize, &bufferSize);
 	if (status != 0) {
 		free(pProcessInfo);
-		if (status == (NTSTATUS)0xC0000004L) { //STATUS_INFO_LENGTH_MISMATCH
+		if (status == (NTSTATUS)STATUS_INFO_LENGTH_MISMATCH) {
 			goto RETRY;
 		}
 		return 0;
@@ -490,7 +504,7 @@ RETRY:
 		&SSPI, sizeof(SSPI), &bufferSize);
 	if (status != 0) {
 		free(pProcessInfo);
-		if (status == (NTSTATUS)0xC0000004L) { //STATUS_INFO_LENGTH_MISMATCH
+		if (status == (NTSTATUS)STATUS_INFO_LENGTH_MISMATCH) {
 			goto RETRY;
 		}
 		return 0;
@@ -596,5 +610,107 @@ BOOL ps_m4(std::vector<ProcItem>& ls, DWORD mpid)
 		}
 	}
 	sort_ps(ls);
+	return TRUE;
+}
+
+
+
+typedef struct _SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX
+{
+	PVOID Object;
+	ULONG_PTR UniqueProcessId;
+	ULONG_PTR HandleValue;
+	ULONG GrantedAccess;
+	USHORT CreatorBackTraceIndex;
+	USHORT ObjectTypeIndex;
+	ULONG HandleAttributes;
+	ULONG Reserved;
+} SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX, * PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX;
+
+typedef struct _SYSTEM_HANDLE_INFORMATION_EX
+{
+	ULONG_PTR NumberOfHandles;
+	ULONG_PTR Reserved;
+	SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX Handles[1];
+} SYSTEM_HANDLE_INFORMATION_EX, * PSYSTEM_HANDLE_INFORMATION_EX;
+
+
+static
+NTSTATUS EnumHandles(
+	PSYSTEM_HANDLE_INFORMATION_EX* Handles
+)
+{
+	PNtQuerySystemInformation NtQuerySystemInformation = GetNtQuerySystemInformation();
+	const int _SystemExtendedHandleInformation = 64;
+	static ULONG initialBufferSize = 0x10000;
+	NTSTATUS status;
+	PVOID buffer;
+	ULONG bufferSize;
+
+	bufferSize = initialBufferSize;
+	buffer = malloc(bufferSize);
+
+	while ((status = NtQuerySystemInformation(
+		(SYSTEM_INFORMATION_CLASS)_SystemExtendedHandleInformation,
+		buffer,
+		bufferSize,
+		NULL
+	)) == STATUS_INFO_LENGTH_MISMATCH)
+	{
+		free(buffer);
+		bufferSize *= 2;
+
+		if (bufferSize > (256 * 1024 * 1024))
+			return STATUS_INSUFFICIENT_RESOURCES;
+
+		buffer = malloc(bufferSize);
+	}
+
+	if (!NT_SUCCESS(status))
+	{
+		free(buffer);
+		return status;
+	}
+
+	if (bufferSize <= 0x200000) initialBufferSize = bufferSize;
+	*Handles = (PSYSTEM_HANDLE_INFORMATION_EX)buffer;
+
+	return status;
+}
+
+
+BOOL ps_m5(std::vector<ProcItem>& ls)
+{
+	BOOL bRes = FALSE;
+	NTSTATUS status;
+	PSYSTEM_HANDLE_INFORMATION_EX p = NULL;
+	std::map<ULONG_PTR, HANDLE> prochandls;
+	std::set< ULONG_PTR > pids;
+
+	status = EnumHandles(&p);
+	if (!NT_SUCCESS(status))
+		return FALSE;
+
+	PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX h = p->Handles;
+
+	for (ULONG i = 0; i < p->NumberOfHandles; i++)
+	{
+		if (h[i].UniqueProcessId <= 8)
+			continue;
+
+		pids.insert(h[i].UniqueProcessId);
+	}
+
+	free(p);
+
+	for (auto pid : pids) {
+		ProcItem pi;
+		memset(&pi, 0, sizeof(pi));
+		pi.dwPID = (DWORD)pid;
+		GetProcessPathByPid(pi.dwPID, pi.szPath, MAX_PATH);
+		ls.push_back(pi);
+	}
+	sort_ps(ls);
+
 	return TRUE;
 }
